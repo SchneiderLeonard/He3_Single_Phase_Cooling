@@ -19,6 +19,9 @@ import seaborn as sns
 import pandas as pd
 import array as arr
 
+# command line options
+from optparse import OptionParser
+
 
 from sys import platform
 if any([platform.startswith(os_name) for os_name in ['linux', 'darwin', 'freebsd']]):
@@ -31,6 +34,18 @@ else:
     exit(1)
 # Linux version:
 # import zugbruecke as ctypes
+    
+    
+# parse command line arguments
+
+parser = OptionParser()
+
+parser.add_option("-b", "--boundary",
+                  action="store_true", dest="yes_boundary", default=False,
+                  help="Include boundary layer")
+
+(options, args) = parser.parse_args()
+    
 
 # first example:  calling DFPTdll
 # "Density from Pressure and Temperature"
@@ -204,7 +219,8 @@ Tstart = 3.2 # K
 Tbath = 1.6 # K
 Tend = 2.24 # K
 Tend2 = 1.8 # K
-#(1)    Tboundary = (Tstart + Tbath)/2
+if options.yes_boundary:
+    Tboundary = (Tstart + Tbath)/2
 mdot = 1.1 # g/s
 step = 0.01 # m 
 p0 = 30000. # Pa
@@ -219,6 +235,7 @@ Xprop = (ctypes.c_double*40)()
  
 elllist = []
 Tlist = []
+Blist = []
 
 
 while Tstart > Tend:    
@@ -243,16 +260,21 @@ while Tstart > Tend:
     Nu = 0.023*Re**0.8*Pr**0.3
     k_f = Xprop[27]
     h = Nu*k_f/d_m
-    dT_f = h*pi*d_m*(Tbath-Tstart)/mdot_m/C_p*step #in case (1): comment this line out
-    #(1)    dT_f = h*pi*d_m*(Tboundary-Tstart)/mdot_m/C_p*step
+    if not options.yes_boundary:
+        dT_f = h*pi*d_m*(Tbath-Tstart)/mdot_m/C_p*step #in case (1): comment this line out
+    else:
+        dT_f = h*pi*d_m*(Tboundary-Tstart)/mdot_m/C_p*step
 #REST PARAMETERS
 
     elllist.append(ell)
     Tlist.append(Tstart)
+    if options.yes_boundary:
+        Blist.append(Tboundary)    
     
     ell = ell + step
     Tstart = Tstart + dT_f
-    #(1)    Tboundary = (Tstart + Tbath)/2
+    if options.yes_boundary:
+        Tboundary = (Tstart + Tbath)/2
     
 print("{:10.4f} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4e}".format(ell,Tstart,rho.value,C_p,mu,Re,Pr,Nu,k_f,h,dT_f))
  
@@ -270,6 +292,8 @@ TIPsatdll(Tk,pres)
 
 temperature = Tk.value
 
+if options.yes_boundary:
+    T_boundary = (Tk.value + Twall)/2
 
 XpropL = (ctypes.c_double*40)()
 XpropV = (ctypes.c_double*40)()
@@ -289,7 +313,12 @@ while x > 0:
     Nu = 0.023 * Re_0**0.8 * Pr_L**(1./3.)*sqrt((1-x)+rho_L/rho_V*x)
     k_L = XpropL[27] # W/(m*K)
     hc = Nu*k_L/(diameter/1000.)  # W/(m^2*K)
-    dQ_dot = hc*(pi*diameter/1000.)*(temperature-Twall)*step # W
+    
+    if not options.yes_boundary:
+        dQ_dot = hc*(pi*diameter/1000.)*(temperature-Twall)*step # W
+    else:
+        dQ_dot = hc*(pi*diameter/1000.)*(temperature-T_boundary)*step # W
+    
     dx = dQ_dot/(-(mdot/1000.)*(h_V-h_L))
     dQ_dot_over_dL = dQ_dot/step # W/m
     #print(ell,Tk.value,p0,x,rho_V,h_V,rho_L,h_L,mu_L,Re_0,Pr_L,Nu,k_L,hc,dQ_dot,dx,dQ_dot_over_dL)
@@ -301,6 +330,8 @@ while x > 0:
     elllist.append(ell)
     Tlist.append(Tk.value)
     dQdLlist.append(dQ_dot_over_dL)
+    if options.yes_boundary:
+        Blist.append(T_boundary)
     
     x = x + dx
     ell = ell + step
@@ -329,16 +360,21 @@ while Tstart > Tend2:
     Nu = 0.023*Re**0.8*Pr**0.3
     k_f = Xprop[27]
     h = Nu*k_f/d_m
-    dT_f = h*pi*d_m*(Tbath-Tstart)/mdot_m/C_p*step #in case (1): comment this line out
-    #(1)    dT_f = h*pi*d_m*(Tboundary-Tstart)/mdot_m/C_p*step
+    if not options.yes_boundary:
+        dT_f = h*pi*d_m*(Tbath-Tstart)/mdot_m/C_p*step #in case (1): comment this line out
+    else:
+        dT_f = h*pi*d_m*(Tboundary-Tstart)/mdot_m/C_p*step
 #REST PARAMETERS
 
     elllist.append(ell)
     Tlist.append(Tstart)
+    if options.yes_boundary:
+        Blist.append(Tboundary)
     
     ell = ell + step
     Tstart = Tstart + dT_f
-    #(1)    Tboundary = (Tstart + Tbath)/2
+    if options.yes_boundary:
+        Tboundary = (Tstart + Tbath)/2
     
 print("{:10.4f} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4e}".format(ell,Tstart,rho.value,C_p,mu,Re,Pr,Nu,k_f,h,dT_f))
 
@@ -346,11 +382,13 @@ print("{:10.4f} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4f} {:10.4f} {
 
 plt.plot(elllist,Tlist)
 #custom size of graph _=plt.plot(3,1)
-zz = np.polyfit(elllist, Tlist, 2)
-p = np.poly1d(zz)
+
 
 #plt.plot(elllist,p(elllist),"r--")
 #plt.title("$T=%.3f(\mathrm{K m}^{-2})L^2+(%.3f)(\mathrm{K m}^{-1})L+%.3f\mathrm{K}$"%(z[0],z[1],z[2]))
+if options.yes_boundary:
+    plt.plot(elllist,Blist,color='orange')
+plt.plot([elllist[0],elllist[-1]],[saturation_temperature,saturation_temperature],"--",color="cyan")
 plt.xlabel('L [m]')     
 plt.ylabel('T [K]')         
 plt.show()
