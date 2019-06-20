@@ -214,22 +214,28 @@ TIPsatdll.argtypes = (ctypes.POINTER(ctypes.c_double),ctypes.POINTER(ctypes.c_do
 #(1) All comments beginning with (1) are needed to claculate the length including the boundary layer.
 
 
-diameter = 6 # mm
-Tstart = 3.2 # K 
-Tbath = 1.6 # K
-Tend = 2.24 # K
-Tend2 = 1.8 # K
+diameter = 6. # mm
+Tstart = 4. # K; Temperature of He3 at Inlet of first gaseous cooling part
+Tbath = 1.4 # K
+Tend2 = 1.5 # K; Temperature of He3 at Outlet of last liquid cooling part
 if options.yes_boundary:
     Tboundary = (Tstart + Tbath)/2
-mdot = 1.1 # g/s
+mdot = 0.5 # g/s
 step = 0.01 # m 
-p0 = 30000. # Pa
+p0 = 25000. # Pa
 
 ell  = 0.0  # m; starting position
 
 
 d_m = diameter/1000 # m
 mdot_m = mdot/1000 # kg/s
+
+Tk = ctypes.c_double()
+pres = ctypes.c_double(p0)
+TIPsatdll(Tk,pres)
+temperature = Tk.value
+
+Tend = Tk.value #K
 
 Xprop = (ctypes.c_double*40)()
  
@@ -279,21 +285,13 @@ while Tstart > Tend:
 print("{:10.4f} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4f} {:10.4f} {:10.4e} {:10.4f} {:10.4e}".format(ell,Tstart,rho.value,C_p,mu,Re,Pr,Nu,k_f,h,dT_f))
  
     
-Twall = 1.6 # K    
+#Twall = 1.6 # K    
 x0 = 1.0 # quality starts as vapour
 x1 = 0.0 # quality ends as liquid
 x = x0 # starting quality
 
-Tk = ctypes.c_double()
-pres = ctypes.c_double(p0)
-
-TIPsatdll(Tk,pres)
-
-
-temperature = Tk.value
-
 if options.yes_boundary:
-    T_boundary = (Tk.value + Twall)/2
+    T_boundary = (Tk.value + Tbath)/2
 
 XpropL = (ctypes.c_double*40)()
 XpropV = (ctypes.c_double*40)()
@@ -315,7 +313,7 @@ while x > 0:
     hc = Nu*k_L/(diameter/1000.)  # W/(m^2*K)
     
     if not options.yes_boundary:
-        dQ_dot = hc*(pi*diameter/1000.)*(temperature-Twall)*step # W
+        dQ_dot = hc*(pi*diameter/1000.)*(temperature-Tbath)*step # W
     else:
         dQ_dot = hc*(pi*diameter/1000.)*(temperature-T_boundary)*step # W
     
@@ -388,7 +386,7 @@ plt.plot(elllist,Tlist)
 #plt.title("$T=%.3f(\mathrm{K m}^{-2})L^2+(%.3f)(\mathrm{K m}^{-1})L+%.3f\mathrm{K}$"%(z[0],z[1],z[2]))
 if options.yes_boundary:
     plt.plot(elllist,Blist,color='orange')
-plt.plot([elllist[0],elllist[-1]],[saturation_temperature,saturation_temperature],"--",color="cyan")
+plt.plot([elllist[0],elllist[-1]],[temperature,temperature],"--",color="cyan")
 plt.xlabel('L [m]')     
 plt.ylabel('T [K]')         
 plt.show()
