@@ -238,7 +238,7 @@ d_m = diameter/1000 # m
 mdot_m = mdot/1000 # kg/s
 
 Xprop = (ctypes.c_double*40)()
- 
+
 elllist = []
 Tlist = []
 Blist = []
@@ -272,7 +272,7 @@ while Tstart > Tend:
         dT_f = h*pi*d_m*(Tboundary-Tstart)/mdot_m/C_p*step
 #REST PARAMETERS
 
-    elllist.append(ell)
+    elllist.append(ell) 
     Tlist.append(Tstart)
     if options.yes_boundary:
         Blist.append(Tboundary)
